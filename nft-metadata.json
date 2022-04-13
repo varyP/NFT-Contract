@@ -1,0 +1,41 @@
+{
+    "attributes" : [
+    {
+      "trait_type": "xRadius",
+      "value": 180
+    },
+    {
+      "trait_type": "yRadius",
+      "value": 214.21742612747374
+    },
+    {
+      "trait_type": "popSize",
+      "value": 260
+    },
+    {
+      "trait_type": "symmetry",
+      "value": 6
+    },
+    {
+      "trait_type": "buddyView",
+      "value": 18
+    },
+    {
+      "trait_type": "buddyMode",
+      "value": "Regular"
+    },
+    {
+      "trait_type": "bgColor",
+      "value": "Moon"
+    },
+    {
+      "trait_type": "Audio",
+      "value": "Soothing"
+    }
+    ],
+    "description" : "Generative Sup with Music.",
+    "animation_url" : "https://gateway.pinata.cloud/ipfs/QmYbZ2JbeXC5BJ9KDufS4F5FHYfkWjs649XP2MPrdfEdCw",
+    "background_color": "000000",
+    "image": "https://gateway.pinata.cloud/ipfs/QmUzEchZTPSdzXrRqtZKEw99v3ieqKQMnZRjQZhXQFatTU",
+    "name" : "Sup Sup"
+}
