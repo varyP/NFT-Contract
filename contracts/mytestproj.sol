@@ -208,6 +208,86 @@ interface IERC165 {
 }
 
 
+
+/**
+ * @dev Interface of the ERC20 standard as defined in the EIP.
+ */
+interface IERC20 {
+    /**
+     * @dev Returns the amount of tokens in existence.
+     */
+    function totalSupply() external view returns (uint256);
+
+    /**
+     * @dev Returns the amount of tokens owned by `account`.
+     */
+    function balanceOf(address account) external view returns (uint256);
+
+    /**
+     * @dev Moves `amount` tokens from the caller's account to `to`.
+     *
+     * Returns a boolean value indicating whether the operation succeeded.
+     *
+     * Emits a {Transfer} event.
+     */
+    function transfer(address to, uint256 amount) external returns (bool);
+
+    /**
+     * @dev Returns the remaining number of tokens that `spender` will be
+     * allowed to spend on behalf of `owner` through {transferFrom}. This is
+     * zero by default.
+     *
+     * This value changes when {approve} or {transferFrom} are called.
+     */
+    function allowance(address owner, address spender) external view returns (uint256);
+
+    /**
+     * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
+     *
+     * Returns a boolean value indicating whether the operation succeeded.
+     *
+     * IMPORTANT: Beware that changing an allowance with this method brings the risk
+     * that someone may use both the old and the new allowance by unfortunate
+     * transaction ordering. One possible solution to mitigate this race
+     * condition is to first reduce the spender's allowance to 0 and set the
+     * desired value afterwards:
+     * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
+     *
+     * Emits an {Approval} event.
+     */
+    function approve(address spender, uint256 amount) external returns (bool);
+
+    /**
+     * @dev Moves `amount` tokens from `from` to `to` using the
+     * allowance mechanism. `amount` is then deducted from the caller's
+     * allowance.
+     *
+     * Returns a boolean value indicating whether the operation succeeded.
+     *
+     * Emits a {Transfer} event.
+     */
+    function transferFrom(
+        address from,
+        address to,
+        uint256 amount
+    ) external returns (bool);
+
+    /**
+     * @dev Emitted when `value` tokens are moved from one account (`from`) to
+     * another (`to`).
+     *
+     * Note that `value` may be zero.
+     */
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    /**
+     * @dev Emitted when the allowance of a `spender` for an `owner` is set by
+     * a call to {approve}. `value` is the new allowance.
+     */
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+
 // File @openzeppelin/contracts/token/ERC721/IERC721.sol@v4.4.2
 
 
@@ -1326,45 +1406,62 @@ contract ERC721A is Context, ERC165, IERC721, IERC721Metadata {
     ) internal virtual {}
 }
 
-/*
- * @title MerkleProof
- * @dev Merkle proof verification
- * @note Based on https://github.com/ameensol/merkle-tree-solidity/blob/master/src/MerkleProof.sol
+/**
+ * @dev These functions deal with verification of Merkle Trees proofs.
+ *
+ * The proofs can be generated using the JavaScript library
+ * https://github.com/miguelmota/merkletreejs[merkletreejs].
+ * Note: the hashing algorithm should be keccak256 and pair sorting should be enabled.
+ *
+ * See `test/utils/cryptography/MerkleProof.test.js` for some examples.
  */
 library MerkleProof {
-  /*
-   * @dev Verifies a Merkle proof proving the existence of a leaf in a Merkle tree. Assumes that each pair of leaves
-   * and each pair of pre-images is sorted.
-   * @param _proof Merkle proof containing sibling hashes on the branch from the leaf to the root of the Merkle tree
-   * @param _root Merkle root
-   * @param _leaf Leaf of Merkle tree
-   */
-  function verifyProof(bytes _proof, bytes32 _root, bytes32 _leaf) public pure returns (bool) {
-    // Check if proof length is a multiple of 32
-    if (_proof.length % 32 != 0) return false;
-
-    bytes32 proofElement;
-    bytes32 computedHash = _leaf;
-
-    for (uint256 i = 32; i <= _proof.length; i += 32) {
-      assembly {
-        // Load the current element of the proof
-        proofElement := mload(add(_proof, i))
-      }
-
-      if (computedHash < proofElement) {
-        // Hash(current computed hash + current element of the proof)
-        computedHash = keccak256(computedHash, proofElement);
-      } else {
-        // Hash(current element of the proof + current computed hash)
-        computedHash = keccak256(proofElement, computedHash);
-      }
+    /**
+     * @dev Returns true if a `leaf` can be proved to be a part of a Merkle tree
+     * defined by `root`. For this, a `proof` must be provided, containing
+     * sibling hashes on the branch from the leaf to the root of the tree. Each
+     * pair of leaves and each pair of pre-images are assumed to be sorted.
+     */
+    function verify(
+        bytes32[] memory proof,
+        bytes32 root,
+        bytes32 leaf
+    ) internal pure returns (bool) {
+        return processProof(proof, leaf) == root;
     }
 
-    // Check if the computed hash (root) is equal to the provided root
-    return computedHash == _root;
-  }
+    /**
+     * @dev Returns the rebuilt hash obtained by traversing a Merklee tree up
+     * from `leaf` using `proof`. A `proof` is valid if and only if the rebuilt
+     * hash matches the root of the tree. When processing the proof, the pairs
+     * of leafs & pre-images are assumed to be sorted.
+     *
+     * _Available since v4.4._
+     */
+    function processProof(bytes32[] memory proof, bytes32 leaf) internal pure returns (bytes32) {
+        bytes32 computedHash = leaf;
+        for (uint256 i = 0; i < proof.length; i++) {
+            bytes32 proofElement = proof[i];
+            if (computedHash <= proofElement) {
+                // Hash(current computed hash + current element of the proof)
+                computedHash = _efficientHash(computedHash, proofElement);
+            } else {
+                // Hash(current element of the proof + current computed hash)
+                computedHash = _efficientHash(proofElement, computedHash);
+            }
+        }
+        return computedHash;
+    }
+
+    function _efficientHash(bytes32 a, bytes32 b) private pure returns (bytes32 value) {
+        assembly {
+            mstore(0x00, a)
+            mstore(0x20, b)
+            value := keccak256(0x00, 0x40)
+        }
+    }
 }
+
 
 // File contracts/mytestproj.sol
 //xmfer
@@ -1376,35 +1473,49 @@ contract mytestproj is ERC721A, Ownable {
     // Mainnet - 0xa5409ec958C83C3f309868babACA7c86DCB077c1
     // Rinkeby - 0xF57B2c51dED3A29e6891aba85459d600256Cf317
     address public constant proxyRegistryAddress = 0xF57B2c51dED3A29e6891aba85459d600256Cf317;
-
-    uint256 public constant MAX_PER_TX_FREE = 4;
     uint256 public constant MAX_PER_TX = 10;
-    uint256 public constant FREE_MAX_SUPPLY = 10;
+    // uint256 public constant FREE_MAX_SUPPLY = 0;
     uint256 public constant MAX_SUPPLY = 6969;
-    uint256 public constant price = 0.033 ether;
+    uint256 public constant price = 0.011 ether;
     uint256 public maxSupply;
 
     bool public paused = true;
+    bytes32 public merkleRoot;
+    mapping(address => uint) public amountNFTsperWalletWhitelistSale;
 
-    constructor() ERC721A("mytestproj", "tst") {
+    constructor(bytes32 _merkleRoot, string memory _baseURI) ERC721A("mytestproj2", "tst2") {
         maxSupply = MAX_SUPPLY;
+        merkleRoot = _merkleRoot;
+        baseURI = _baseURI;
+    }
+
+    //Whitelist
+    function setMerkleRoot(bytes32 _merkleRoot) external onlyOwner {
+        merkleRoot = _merkleRoot;
+    }
+
+    function whitelistMint(bytes32[] memory proof) external payable {
+        address _caller = _msgSender();
+        uint256 _quantity = 1;
+        require(isValid(proof, keccak256(abi.encodePacked(msg.sender))), "Not a part of Allowlist");
+        require(!paused, "Sale not started yet");
+        require(MAX_SUPPLY >= totalSupply() + _quantity, "Exceeds max supply");
+        require(tx.origin == _caller, "No contracts");
+        require(amountNFTsperWalletWhitelistSale[msg.sender] + _quantity <= 1, "You can only get 1 NFT on the Whitelist Sale");
+        amountNFTsperWalletWhitelistSale[msg.sender] += _quantity;
+        
+        _safeMint(_caller, _quantity);
     }
 
     function mint(uint256 _amount) external payable {
         address _caller = _msgSender();
-        require(!paused, "Paused");
+        require(!paused, "Sale not started yet");
         require(MAX_SUPPLY >= totalSupply() + _amount, "Exceeds max supply");
         require(_amount > 0, "No 0 mints");
         require(tx.origin == _caller, "No contracts");
 
-        if(FREE_MAX_SUPPLY >= totalSupply() ){
-            //Minted supply is less than Max Free & Amount being minted won't exceed Max Free
-            require(FREE_MAX_SUPPLY - totalSupply() > _amount, "Excess max per free tx");
-            require(MAX_PER_TX_FREE >= _amount , "Excess max per free tx");
-        }else{
-            require(MAX_PER_TX >= _amount , "Excess max per paid tx");
-            require(_amount * price == msg.value, "Invalid funds provided");
-        }
+        require(MAX_PER_TX >= _amount , "Excess max per paid tx");
+        require(_amount * price == msg.value, "Invalid funds provided");
 
         _safeMint(_caller, _amount);
     }
@@ -1424,10 +1535,18 @@ contract mytestproj is ERC721A, Ownable {
         return super.isApprovedForAll(owner, operator);
     }
 
+    function isValid(bytes32[] memory proof, bytes32 leaf) public view returns (bool) {
+        return MerkleProof.verify(proof, merkleRoot, leaf);
+    }
+
     function withdraw() external onlyOwner {
         uint256 balance = address(this).balance;
         (bool success, ) = _msgSender().call{value: balance}("");
         require(success, "Failed to send");
+    }
+
+    function withdrawAllERC20(IERC20 _erc20Token) external onlyOwner {
+        _erc20Token.transfer(owner(), _erc20Token.balanceOf(address(this)));
     }
 
     function setupOS() external onlyOwner {
@@ -1458,6 +1577,16 @@ contract mytestproj is ERC721A, Ownable {
     }
 
     function renounceOwnership() public override onlyOwner {}
+
+    // function royaltyInfo(uint256 _tokenId, uint256 _salePrice)
+    //     external
+    //     view
+    //     override
+    //     returns (address, uint256)
+    // {
+    //     // Return 5% royalties.
+    //     return (owner(), (_salePrice * 5) / 100);
+    // }
 }
 
 contract OwnableDelegateProxy { }
